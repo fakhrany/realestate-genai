@@ -1,0 +1,60 @@
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client { provider = "prisma-client-js" }
+
+model Unit {
+  id           String   @id @default(cuid())
+  projectId    String
+  type         String
+  bedrooms     Int
+  bathrooms    Int?
+  sizeSqm      Int
+  priceEgp     Int?
+  priceUsd     Int?
+  currency     String?   @default("EGP")
+  images       String[]  @default([])
+  paymentPlan  Json?
+  availability String    @default("available")
+  floor        Int?
+  view         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  embedding    Vector?   @db.Vector(1536)
+
+  project      Project   @relation(fields: [projectId], references: [id])
+}
+
+model Project {
+  id           String    @id @default(cuid())
+  developerId  String
+  name         String
+  city         String
+  district     String
+  lat          Float
+  lng          Float
+  deliveryDate Int?
+  amenities    String[]  @default([])
+  description  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  units        Unit[]
+  developer    Developer @relation(fields: [developerId], references: [id])
+}
+
+model Developer {
+  id        String   @id @default(cuid())
+  name      String
+  logo      String?
+  country   String?
+  website   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  projects  Project[]
+}
+
+model SourceDoc {
+  id        String   @id @default(cuid())
+  title     String   @unique
+  url       String?
+  lang      String
+  embedding Vector   @db.Vector(1536)
+}
