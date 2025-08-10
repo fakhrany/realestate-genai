@@ -27,8 +27,8 @@ model Unit {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  // pgvector column (optional – can stay null until you add embeddings)
-  embedding    Float[]?  @db.Vector(1536)
+  // Required vector (Prisma doesn't support optional lists)
+  embedding    Float[]   @db.Vector(1536)
 
   project      Project   @relation(fields: [projectId], references: [id])
 }
@@ -63,13 +63,12 @@ model Developer {
   projects  Project[]
 }
 
-// Optional doc store for RAG
 model SourceDoc {
   id        String   @id @default(cuid())
   title     String   @unique
   url       String?
   lang      String
 
-  // pgvector column (required for docs)
-  embedding Float[]  @db.Vector(1536)
+  // Required vector (seed will provide zeros for now)
+  embedding Float[]   @db.Vector(1536)
 }
