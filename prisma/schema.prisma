@@ -1,5 +1,18 @@
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
-generator client { provider = "prisma-client-js" }
+// prisma/schema.prisma
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+
+  // Enable pgvector so @db.Vector(1536) works
+  extensions = [
+    { name = "vector" }
+  ]
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
 
 model Unit {
   id           String   @id @default(cuid())
@@ -36,6 +49,7 @@ model Project {
   description  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
   units        Unit[]
   developer    Developer @relation(fields: [developerId], references: [id])
 }
@@ -48,6 +62,7 @@ model Developer {
   website   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   projects  Project[]
 }
 
