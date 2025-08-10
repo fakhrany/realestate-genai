@@ -3,10 +3,16 @@
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+
+  // pgvector extension (works with previewFeatures below)
+  extensions = [
+    { name = "vector" }
+  ]
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "vector"]
 }
 
 model Unit {
@@ -27,7 +33,7 @@ model Unit {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  // Required vector (Prisma doesn't support optional lists)
+  // REQUIRED list – Prisma does not allow optional lists
   embedding    Float[]   @db.Vector(1536)
 
   project      Project   @relation(fields: [projectId], references: [id])
@@ -69,6 +75,6 @@ model SourceDoc {
   url       String?
   lang      String
 
-  // Required vector (seed will provide zeros for now)
+  // REQUIRED list – provide a value when inserting
   embedding Float[]   @db.Vector(1536)
 }

@@ -1,45 +1,37 @@
 {
   "name": "realestate-genai",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
-    "lint": "eslint .",
-    "test": "vitest --run",
-    "e2e": "playwright test"
+    "lint": "next lint",
+    "seed": "npx tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@prisma/client": "5.18.0",
     "next": "14.2.5",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "next-intl": "3.14.0",
-    "next-auth": "4.24.7",
-    "@prisma/client": "5.17.0",
-    "zod": "3.23.8",
-    "react-hook-form": "7.51.5",
-    "@hookform/resolvers": "3.9.0",
-    "papaparse": "5.4.1",
-    "mapbox-gl": "3.5.2",
-    "framer-motion": "11.0.17"
+    "next-auth": "^4.24.7",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tailwindcss": "3.4.1",
+    "autoprefixer": "10.4.15",
+    "postcss": "8.4.31",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "typescript": "5.5.4",
-    "@types/react": "18.2.66",
-    "@types/react-dom": "18.2.23",
+    "@types/node": "20.4.8",
+    "@types/react": "18.2.21",
+    "@types/react-dom": "18.2.7",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.5",
-    "prettier": "3.3.3",
-    "tailwindcss": "3.4.10",
-    "postcss": "8.4.41",
-    "autoprefixer": "10.4.19",
-    "prisma": "5.17.0",
-    "vitest": "1.6.0",
-    "@testing-library/react": "14.3.1",
-    "@testing-library/dom": "9.3.4",
-    "jsdom": "24.1.0",
-    "@types/node": "20.14.12",
-    "@playwright/test": "1.46.0"
+    "prettier": "3.0.0",
+    "prisma": "5.18.0",
+    "tsx": "^3.12.7",
+    "typescript": "5.2.2"
   }
 }
