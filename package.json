@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "npx prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "seed": "npx tsx prisma/seed.ts"
@@ -13,15 +13,18 @@
     "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@hookform/resolvers": "3.3.4",
     "@prisma/client": "5.18.0",
+    "autoprefixer": "10.4.15",
     "next": "14.2.5",
-    "next-auth": "^4.24.7",
+    "next-auth": "4.24.7",
+    "next-intl": "3.16.2",
+    "postcss": "8.4.31",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "react-hook-form": "7.53.0",
     "tailwindcss": "3.4.1",
-    "autoprefixer": "10.4.15",
-    "postcss": "8.4.31",
-    "zod": "^3.22.4"
+    "zod": "3.22.4"
   },
   "devDependencies": {
     "@types/node": "20.4.8",
@@ -31,7 +34,7 @@
     "eslint-config-next": "14.2.5",
     "prettier": "3.0.0",
     "prisma": "5.18.0",
-    "tsx": "^3.12.7",
+    "tsx": "3.12.7",
     "typescript": "5.2.2"
   }
 }
