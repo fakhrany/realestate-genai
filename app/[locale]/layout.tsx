@@ -1,31 +1,27 @@
+// app/[locale]/layout.tsx
 import {ReactNode} from 'react';
 import {NextIntlClientProvider} from 'next-intl';
 import {getMessages} from 'next-intl/server';
 
 export const dynamic = 'force-dynamic';
 
-export default async function LocaleLayout({
+export default async function RootLayout({
   children,
   params: {locale}
 }: {
   children: ReactNode;
   params: {locale: string};
 }) {
-  // next-intl will read from i18n/request.ts
+  // Load messages for this request
   const messages = await getMessages();
 
   return (
-    <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+    <html lang={locale}>
       <body>
-        <NextIntlClientProvider locale={locale} messages={messages}>
+        <NextIntlClientProvider messages={messages} locale={locale}>
           {children}
         </NextIntlClientProvider>
       </body>
     </html>
   );
-}
-
-// Pre-generate locales (optional, safe)
-export function generateStaticParams() {
-  return [{locale: 'en'}, {locale: 'ar'}];
 }

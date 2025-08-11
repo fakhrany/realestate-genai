@@ -1,13 +1,13 @@
+// middleware.ts
 import createMiddleware from 'next-intl/middleware';
-import {locales, defaultLocale} from './i18n/request';
 
 export default createMiddleware({
-  // Supported locales & default
-  locales,
-  defaultLocale
+  locales: ['en', 'ar'],
+  defaultLocale: 'en',
+  localePrefix: 'always'
 });
 
 export const config = {
-  // Paths that should be localized
+  // Match the root and any path under /en or /ar
   matcher: ['/', '/(en|ar)/:path*']
 };

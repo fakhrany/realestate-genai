@@ -1,19 +1,19 @@
-import {getRequestConfig} from 'next-intl/server';
+// i18n/request.ts
+import {createRequestConfig} from 'next-intl/server';
 
-// Locales your app supports
-export const locales = ['en', 'ar'] as const;
-export type AppLocale = (typeof locales)[number];
+export default createRequestConfig({
+  // The locales your app supports
+  locales: ['en', 'ar'],
 
-// Default locale
-export const defaultLocale: AppLocale = 'en';
+  // The default locale
+  defaultLocale: 'en',
 
-// Tell next-intl where to load messages for each locale
-export default getRequestConfig(async ({locale}) => {
-  // Load the JSON from your existing messages
-  const messages = (await import(`@/lib/i18n/messages/${locale}.json`)).default;
+  // Use "/en" and "/ar" prefixes consistently
+  localePrefix: 'always'
 
-  return {
-    locale,
-    messages
-  };
+  // If you later want per-route pathnames, you can add:
+  // pathnames: {
+  //   '/': '/',
+  //   '/admin': '/admin'
+  // }
 });
