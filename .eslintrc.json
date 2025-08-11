@@ -1,7 +1,15 @@
 {
-  "extends": [
-    "next/core-web-vitals",
-    "eslint:recommended"
-  ],
-  "rules": {}
+  "root": true,
+  "extends": ["next", "next/core-web-vitals"],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2022": true
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-empty": "warn",
+    "no-undef": "off",
+    "no-useless-escape": "off"
+  }
 }
