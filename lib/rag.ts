@@ -32,6 +32,11 @@ export type RagResult = {
 };
 
 type CityDistrict = { city: string | null; district: string | null };
+type UnitWithProject = any; // narrow later if you add Prisma types
+type SourceDocRow = any;
+
+type ScoredUnit = { u: UnitWithProject; score: number };
+type ScoredDoc = { d: SourceDocRow; score: number };
 
 const ARABIC_DIGIT_MAP: Record<string, string> = {
   '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
@@ -57,16 +62,19 @@ export async function parseQuery(raw: string, locale: 'en' | 'ar'): Promise<Pars
   const q0 = normalizeDigits(raw).toLowerCase();
   const q = q0.normalize('NFKC');
 
+  // bedrooms
   let bedrooms: number | undefined;
   const bedReEn = /(\b|_)(?:bed|beds|bedroom|bedrooms)\s*(\d{1,2})/i;
   const bedReAr = /(\b|_)(?:غرف|غرفة|نوم)\s*(\d{1,2})/i;
   const mBed = q.match(locale === 'ar' ? bedReAr : bedReEn) || q.match(bedReEn) || q.match(bedReAr);
   if (mBed) bedrooms = parseInt(mBed[2]);
 
+  // delivery year
   let deliveryYear: number | undefined;
   const mYear = q.match(/20\d{2}/);
   if (mYear) deliveryYear = parseInt(mYear[0]);
 
+  // price max
   let priceMax: number | undefined;
   const pricePhrases = [
     /(under|below|<=|<|max|budget)\s*([0-9.]+\s*(?:k|m)?)/i,
@@ -81,6 +89,7 @@ export async function parseQuery(raw: string, locale: 'en' | 'ar'): Promise<Pars
     }
   }
 
+  // city / district from DB
   let city: string | undefined;
   let district: string | undefined;
   try {
@@ -88,26 +97,26 @@ export async function parseQuery(raw: string, locale: 'en' | 'ar'): Promise<Pars
       select: { city: true, district: true }
     });
 
-    const cities = Array.from(
+    const cities: string[] = Array.from(
       new Set(
         allProjects
           .map((p: CityDistrict) => (p.city ?? '').toLowerCase())
-          .filter((s): s is string => s.length > 0)
+          .filter((s: string) => s.length > 0)
       )
     );
 
-    const districts = Array.from(
+    const districts: string[] = Array.from(
       new Set(
         allProjects
           .map((p: CityDistrict) => (p.district ?? '').toLowerCase())
-          .filter((s): s is string => s.length > 0)
+          .filter((s: string) => s.length > 0)
       )
     );
 
     for (const c of cities) if (c && q.includes(c)) city = c;
     for (const d of districts) if (d && q.includes(d)) district = d;
   } catch {
-    // DB not ready; skip
+    // DB might not be ready — skip gracefully
   }
 
   return { locale, priceMax, bedrooms, deliveryYear, city, district, textForEmbedding: q };
@@ -127,6 +136,7 @@ async function embed(text: string): Promise<number[]> {
     const json: any = await res.json();
     return json.data[0].embedding as number[];
   }
+  // fallback deterministic vector
   const vec = new Array(1536).fill(0) as number[];
   let i = 0;
   for (const ch of Array.from(text)) {
@@ -156,7 +166,7 @@ function fmtPrice(egp?: number | null, usd?: number | null, currency = 'EGP') {
   return '—';
 }
 
-async function searchUnits(parsed: Parsed, limit = 24) {
+async function searchUnits(parsed: Parsed, limit = 24): Promise<UnitWithProject[]> {
   const emb = await embed(parsed.textForEmbedding);
 
   const where: any = { project: {} as any };
@@ -166,38 +176,40 @@ async function searchUnits(parsed: Parsed, limit = 24) {
   if (parsed.city) (where.project as any).city = { equals: parsed.city, mode: 'insensitive' };
   if (parsed.district) (where.project as any).district = { equals: parsed.district, mode: 'insensitive' };
 
-  const units = await prisma.unit.findMany({
+  const units: UnitWithProject[] = await prisma.unit.findMany({
     where,
-    take: limit * 3,
+    take: limit * 3, // over-fetch then score
     include: {
       project: { select: { name: true, lat: true, lng: true } }
     }
   });
 
-  const scored = units.map((u: any) => ({
+  const scored: ScoredUnit[] = units.map((u: UnitWithProject): ScoredUnit => ({
     u,
-    score: Array.isArray(u.embedding) ? cosine(u.embedding as unknown as number[], emb) : 0
+    score: Array.isArray((u as any).embedding)
+      ? cosine(((u as any).embedding as unknown as number[]), emb)
+      : 0
   }));
 
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.u);
+  scored.sort((a: ScoredUnit, b: ScoredUnit) => b.score - a.score);
+  return scored.slice(0, limit).map((s: ScoredUnit) => s.u);
 }
 
-async function searchSources(parsed: Parsed, limit = 5) {
+async function searchSources(parsed: Parsed, limit = 5): Promise<SourceDocRow[]> {
   const emb = await embed(parsed.textForEmbedding);
   try {
-    const docs = await prisma.sourceDoc.findMany({
+    const docs: SourceDocRow[] = await prisma.sourceDoc.findMany({
       where: { lang: parsed.locale },
       take: limit * 3
     });
-    const scored = docs.map((d: any) => ({
+    const scored: ScoredDoc[] = docs.map((d: SourceDocRow): ScoredDoc => ({
       d,
-      score: Array.isArray(d.embedding)
-        ? cosine(d.embedding as unknown as number[], emb)
+      score: Array.isArray((d as any).embedding)
+        ? cosine(((d as any).embedding as unknown as number[]), emb)
         : 0
     }));
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, limit).map((s) => s.d);
+    scored.sort((a: ScoredDoc, b: ScoredDoc) => b.score - a.score);
+    return scored.slice(0, limit).map((s: ScoredDoc) => s.d);
   } catch {
     return [];
   }
@@ -215,7 +227,7 @@ export async function runRag({
 
   const pins: RagPin[] = units
     .filter((u: any) => typeof u.project?.lat === 'number' && typeof u.project?.lng === 'number')
-    .map((u: any) => ({
+    .map((u: any): RagPin => ({
       id: String(u.id),
       lat: Number(u.project.lat),
       lng: Number(u.project.lng),
