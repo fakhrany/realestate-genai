@@ -1,292 +1,302 @@
-// prisma/seed.ts
-import { PrismaClient, Prisma } from '@prisma/client';
+/* eslint-disable no-console */
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Reusable zero-vector for pgvector columns (1536 dims)
-const zeroVector = Array(1536).fill(0) as number[];
+type DevSeed = {
+  name: string;
+  logo?: string | null;
+  country?: string | null;
+  website?: string | null;
+};
 
-// Helpers
-const now = () => new Date();
-const rand = (min: number, max: number) =>
-  Math.floor(Math.random() * (max - min + 1)) + min;
+type ProjectSeed = {
+  developerName: string; // we’ll resolve to developerId
+  name: string;
+  city: string;
+  district: string;
+  lat: number;
+  lng: number;
+  deliveryDate?: number | null; // year
+  amenities?: string[] | null;
+  description?: string | null;
+};
 
-async function main() {
-  console.log('Seeding developers…');
+type UnitSeed = {
+  projectName: string; // we’ll resolve to projectId
+  type: 'apartment' | 'villa' | 'th' | 'twin';
+  bedrooms: number;
+  bathrooms?: number | null;
+  sizeSqm: number;
+  priceEgp?: number | null;
+  priceUsd?: number | null;
+  currency?: string | null;
+  images?: string[] | null;
+  paymentPlan?: Record<string, unknown> | null;
+  availability?: 'available' | 'reserved' | 'sold';
+  floor?: number | null;
+  view?: string | null;
+};
 
-  // 1) Developers
-  const developers = [
-    { name: 'Orascom Development', country: 'EG', website: 'https://www.orascomdh.com/' },
-    { name: 'Talaat Moustafa Group', country: 'EG', website: 'https://www.tmg.com.eg/' },
-    { name: 'SODIC', country: 'EG', website: 'https://www.sodic.com/' },
-    { name: 'Palm Hills Developments', country: 'EG', website: 'https://www.palmhillsdevelopments.com/' },
-    { name: 'Mountain View', country: 'EG', website: 'https://mountainviewegypt.com/' },
-    { name: 'Emaar Misr', country: 'EG', website: 'https://www.emaarmisr.com/' }
-  ];
+// ---------- SAMPLE SEED DATA (small but enough to boot the app) ----------
+const developers: DevSeed[] = [
+  { name: 'Palm Hills', country: 'Egypt', website: 'https://example.com' },
+  { name: 'SODIC', country: 'Egypt', website: 'https://example.com' },
+  { name: 'Talaat Moustafa Group', country: 'Egypt', website: 'https://example.com' },
+  { name: 'Emaar Misr', country: 'Egypt', website: 'https://example.com' },
+  { name: 'Mountain View', country: 'Egypt', website: 'https://example.com' },
+  { name: 'New City Dev', country: 'Egypt', website: 'https://example.com' },
+];
 
-  const devRecords = {} as Record<string, { id: string }>;
-  for (const d of developers) {
-    const rec = await prisma.developer.upsert({
-      where: { name: d.name }, // name is unique in our seed logic
-      update: { ...d, updatedAt: now() },
-      create: { ...d }
+const projects: ProjectSeed[] = [
+  {
+    developerName: 'Palm Hills',
+    name: 'Palm Hills New Cairo',
+    city: 'New Cairo',
+    district: '5th Settlement',
+    lat: 30.0075,
+    lng: 31.4913,
+    deliveryDate: 2026,
+    amenities: ['Clubhouse', 'Pools'],
+    description: 'Modern community in New Cairo.',
+  },
+  {
+    developerName: 'SODIC',
+    name: 'SODIC West',
+    city: '6th of October',
+    district: 'Beverly Hills',
+    lat: 29.9968,
+    lng: 30.9767,
+    deliveryDate: 2025,
+    amenities: ['Parks', 'Retail'],
+    description: 'Established district in West Cairo.',
+  },
+  {
+    developerName: 'Emaar Misr',
+    name: 'Mivida',
+    city: 'New Cairo',
+    district: '90th Street',
+    lat: 30.0209,
+    lng: 31.4577,
+    deliveryDate: 2027,
+    amenities: ['Mall', 'Schools'],
+    description: 'Green community by Emaar.',
+  },
+];
+
+const units: UnitSeed[] = [
+  {
+    projectName: 'Palm Hills New Cairo',
+    type: 'apartment',
+    bedrooms: 3,
+    bathrooms: 2,
+    sizeSqm: 145,
+    priceEgp: 8200000,
+    currency: 'EGP',
+    availability: 'available',
+    floor: 3,
+    view: 'Garden',
+  },
+  {
+    projectName: 'Palm Hills New Cairo',
+    type: 'villa',
+    bedrooms: 4,
+    bathrooms: 4,
+    sizeSqm: 310,
+    priceEgp: 21500000,
+    currency: 'EGP',
+    availability: 'available',
+  },
+  {
+    projectName: 'SODIC West',
+    type: 'apartment',
+    bedrooms: 2,
+    bathrooms: 2,
+    sizeSqm: 120,
+    priceEgp: 5200000,
+    currency: 'EGP',
+    availability: 'available',
+  },
+  {
+    projectName: 'Mivida',
+    type: 'apartment',
+    bedrooms: 3,
+    bathrooms: 2,
+    sizeSqm: 160,
+    priceEgp: 9800000,
+    currency: 'EGP',
+    availability: 'reserved',
+  },
+];
+
+// -------------------- UTILS --------------------
+function now() {
+  return new Date();
+}
+
+async function findOrCreateDeveloper(d: DevSeed) {
+  const existing = await prisma.developer.findFirst({
+    where: { name: d.name },
+  });
+  if (existing) {
+    // Update minimal fields (avoid touching id)
+    return prisma.developer.update({
+      where: { id: existing.id },
+      data: {
+        logo: d.logo ?? existing.logo ?? null,
+        country: d.country ?? existing.country ?? null,
+        website: d.website ?? existing.website ?? null,
+        updatedAt: now(),
+      },
     });
-    devRecords[d.name] = { id: rec.id };
+  }
+  return prisma.developer.create({
+    data: {
+      name: d.name,
+      logo: d.logo ?? null,
+      country: d.country ?? null,
+      website: d.website ?? null,
+      createdAt: now(),
+      updatedAt: now(),
+    },
+  });
+}
+
+async function findOrCreateProject(p: ProjectSeed) {
+  // Resolve developerId by name
+  const dev = await prisma.developer.findFirst({
+    where: { name: p.developerName },
+    select: { id: true },
+  });
+  if (!dev) {
+    throw new Error(
+      `Developer "${p.developerName}" not found while seeding project "${p.name}".`
+    );
   }
 
-  console.log('Seeding projects…');
+  const existing = await prisma.project.findFirst({
+    where: { name: p.name, developerId: dev.id },
+  });
 
-  // 2) Projects (tie to developers)
-  const projects: Array<Prisma.ProjectCreateInput & { key: string }> = [
-    {
-      key: 'O West',
-      name: 'O West',
-      city: '6th of October',
-      district: 'West Cairo',
-      lat: 29.954,
-      lng: 30.916,
-      deliveryDate: 2027,
-      amenities: ['Clubhouse', 'Parks'],
-      description: 'Integrated town in West Cairo.',
-      developer: { connect: { id: devRecords['Orascom Development'].id } }
-    },
-    {
-      key: 'Madinaty',
-      name: 'Madinaty',
-      city: 'New Cairo',
-      district: 'East Cairo',
-      lat: 30.113,
-      lng: 31.628,
-      deliveryDate: 2028,
-      amenities: ['Golf', 'Schools', 'Hospitals'],
-      description: 'A full city by TMG.',
-      developer: { connect: { id: devRecords['Talaat Moustafa Group'].id } }
-    },
-    {
-      key: 'Eastown',
-      name: 'Eastown',
-      city: 'New Cairo',
-      district: '5th Settlement',
-      lat: 30.023,
-      lng: 31.486,
-      deliveryDate: 2026,
-      amenities: ['Mall', 'Security'],
-      description: 'Apartments & townhomes in a prime spot.',
-      developer: { connect: { id: devRecords['SODIC'].id } }
-    },
-    {
-      key: 'Palm Hills October',
-      name: 'Palm Hills October',
-      city: '6th of October',
-      district: 'West Cairo',
-      lat: 29.987,
-      lng: 30.943,
-      deliveryDate: 2027,
-      amenities: ['Club', 'Green areas'],
-      description: 'Villas and apartments community.',
-      developer: { connect: { id: devRecords['Palm Hills Developments'].id } }
-    },
-    {
-      key: 'Mountain View iCity New Cairo',
-      name: 'Mountain View iCity New Cairo',
-      city: 'New Cairo',
-      district: '5th Settlement',
-      lat: 30.030,
-      lng: 31.482,
-      deliveryDate: 2027,
-      amenities: ['Lagoons', 'Clubhouse'],
-      description: 'Smart city concept with parks and lagoons.',
-      developer: { connect: { id: devRecords['Mountain View'].id } }
-    },
-    {
-      key: 'Uptown Cairo',
-      name: 'Uptown Cairo',
-      city: 'Cairo',
-      district: 'Moqattam',
-      lat: 30.064,
-      lng: 31.287,
-      deliveryDate: 2026,
-      amenities: ['Golf', 'Club'],
-      description: 'Hilltop community with city views.',
-      developer: { connect: { id: devRecords['Emaar Misr'].id } }
-    },
-    {
-      key: 'Cairo Gate',
-      name: 'Cairo Gate',
-      city: 'Sheikh Zayed',
-      district: 'West Cairo',
-      lat: 30.056,
-      lng: 30.955,
-      deliveryDate: 2027,
-      amenities: ['Retail', 'Security'],
-      description: 'Emaar’s West Cairo masterplan.',
-      developer: { connect: { id: devRecords['Emaar Misr'].id } }
-    },
-    {
-      key: 'SODIC VILLETTE',
-      name: 'Villette',
-      city: 'New Cairo',
-      district: '5th Settlement',
-      lat: 30.011,
-      lng: 31.484,
-      deliveryDate: 2026,
-      amenities: ['Sports Club', 'Parks'],
-      description: 'Low-rise living with generous open spaces.',
-      developer: { connect: { id: devRecords['SODIC'].id } }
-    },
-    {
-      key: 'Mountain View October Park',
-      name: 'Mountain View October Park',
-      city: '6th of October',
-      district: 'West Cairo',
-      lat: 29.974,
-      lng: 30.939,
-      deliveryDate: 2027,
-      amenities: ['Lakes', 'Walking trails'],
-      description: 'Family-focused community.',
-      developer: { connect: { id: devRecords['Mountain View'].id } }
-    },
-    {
-      key: 'Palm Hills New Cairo',
-      name: 'Palm Hills New Cairo',
-      city: 'New Cairo',
-      district: 'East Cairo',
-      lat: 30.010,
-      lng: 31.600,
-      deliveryDate: 2028,
-      amenities: ['Club', 'Parks'],
-      description: 'Apartments & villas with amenities.',
-      developer: { connect: { id: devRecords['Palm Hills Developments'].id } }
-    }
-  ];
-
-  // Upsert projects by (developerId + name) uniqueness we enforce manually
-  const projectMap: Record<string, string> = {};
-  for (const p of projects) {
-    // Upsert via a synthetic unique: name + developerId. If you have a unique in schema, switch to it.
-    const created = await prisma.project.create({
+  if (existing) {
+    return prisma.project.update({
+      where: { id: existing.id },
       data: {
-        name: p.name,
         city: p.city,
         district: p.district,
         lat: p.lat,
         lng: p.lng,
-        deliveryDate: p.deliveryDate,
-        amenities: p.amenities,
-        description: p.description,
-        developer: p.developer
-      }
+        deliveryDate: p.deliveryDate ?? existing.deliveryDate ?? null,
+        amenities: p.amenities ?? existing.amenities ?? [],
+        description: p.description ?? existing.description ?? null,
+        updatedAt: now(),
+      },
     });
-    projectMap[p.key] = created.id;
   }
 
-  console.log('Seeding units…');
+  return prisma.project.create({
+    data: {
+      developerId: dev.id,
+      name: p.name,
+      city: p.city,
+      district: p.district,
+      lat: p.lat,
+      lng: p.lng,
+      deliveryDate: p.deliveryDate ?? null,
+      amenities: p.amenities ?? [],
+      description: p.description ?? null,
+      createdAt: now(),
+      updatedAt: now(),
+    },
+  });
+}
 
-  // 3) Units (3 per project)
-  const unitType = (i: number) =>
-    i % 3 === 0 ? 'apartment' : i % 3 === 1 ? 'villa' : 'twin';
+async function findOrCreateUnit(u: UnitSeed) {
+  // Resolve projectId by name
+  const project = await prisma.project.findFirst({
+    where: { name: u.projectName },
+    select: { id: true },
+  });
+  if (!project) {
+    throw new Error(
+      `Project "${u.projectName}" not found while seeding a unit.`
+    );
+  }
 
-  const availability = (i: number) =>
-    i % 5 === 0 ? 'reserved' : i % 7 === 0 ? 'sold' : 'available';
+  // There’s no natural unique key; pick a “near-unique” fingerprint for seed purposes
+  const existing = await prisma.unit.findFirst({
+    where: {
+      projectId: project.id,
+      type: u.type,
+      bedrooms: u.bedrooms,
+      sizeSqm: u.sizeSqm,
+      floor: u.floor ?? undefined,
+    },
+  });
 
-  const unitForProject = (projectKey: string, idxBase = 0) => {
-    const pid = projectMap[projectKey];
-    const list: Prisma.UnitCreateManyInput[] = [];
-    for (let i = 0; i < 3; i++) {
-      const idx = idxBase + i;
-      list.push({
-        projectId: pid,
-        type: unitType(idx),
-        bedrooms: rand(1, 4),
-        bathrooms: rand(1, 3),
-        sizeSqm: rand(90, 260),
-        priceEgp: rand(3_500_000, 25_000_000),
-        currency: 'EGP',
-        images: [],
-        paymentPlan: {
-          down: [5, 10, 15][rand(0, 2)],
-          years: [5, 7, 8, 10][rand(0, 3)]
-        } as unknown as Prisma.InputJsonValue,
-        availability: availability(idx),
-        floor: rand(0, 10),
-        view: ['park', 'street', 'club', 'lake'][rand(0, 3)],
-        // embedding is required in schema, but createMany cannot set arrays w/ native mapping across all drivers reliably.
-        // So we’ll insert via create (not createMany) below to ensure embedding gets written.
-      });
-    }
-    return list;
-  };
-
-  const unitsPlan = [
-    ...unitForProject('O West', 0),
-    ...unitForProject('Madinaty', 10),
-    ...unitForProject('Eastown', 20),
-    ...unitForProject('Palm Hills October', 30),
-    ...unitForProject('Mountain View iCity New Cairo', 40),
-    ...unitForProject('Uptown Cairo', 50),
-    ...unitForProject('Cairo Gate', 60),
-    ...unitForProject('SODIC VILLETTE', 70),
-    ...unitForProject('Mountain View October Park', 80),
-    ...unitForProject('Palm Hills New Cairo', 90)
-  ];
-
-  // Insert units one-by-one to guarantee embedding gets set
-  for (const u of unitsPlan) {
-    await prisma.unit.create({
+  if (existing) {
+    return prisma.unit.update({
+      where: { id: existing.id },
       data: {
-        projectId: u.projectId!,
-        type: u.type!,
-        bedrooms: u.bedrooms!,
-        bathrooms: u.bathrooms,
-        sizeSqm: u.sizeSqm!,
-        priceEgp: u.priceEgp,
-        priceUsd: u.priceUsd,
-        currency: u.currency,
-        images: u.images ?? [],
-        paymentPlan: u.paymentPlan as Prisma.InputJsonValue,
-        availability: u.availability!,
-        floor: u.floor,
-        view: u.view,
-        embedding: zeroVector
-      }
+        bathrooms: u.bathrooms ?? existing.bathrooms ?? null,
+        priceEgp: u.priceEgp ?? existing.priceEgp ?? null,
+        priceUsd: u.priceUsd ?? existing.priceUsd ?? null,
+        currency: u.currency ?? existing.currency ?? 'EGP',
+        images: u.images ?? existing.images ?? [],
+        paymentPlan: u.paymentPlan ?? existing.paymentPlan ?? null,
+        availability: u.availability ?? existing.availability ?? 'available',
+        view: u.view ?? existing.view ?? null,
+        updatedAt: now(),
+        // don’t touch embedding here; your RAG job can update it later
+      },
     });
   }
 
-  console.log('Seeding source docs…');
-
-  // 4) Source docs for RAG (optional)
-  const sourceDocs = [
-    {
-      title: 'O West Overview EN',
-      url: 'https://example.com/owest/en',
-      lang: 'en'
+  return prisma.unit.create({
+    data: {
+      projectId: project.id,
+      type: u.type,
+      bedrooms: u.bedrooms,
+      bathrooms: u.bathrooms ?? null,
+      sizeSqm: u.sizeSqm,
+      priceEgp: u.priceEgp ?? null,
+      priceUsd: u.priceUsd ?? null,
+      currency: u.currency ?? 'EGP',
+      images: u.images ?? [],
+      paymentPlan: u.paymentPlan ?? null,
+      availability: u.availability ?? 'available',
+      floor: u.floor ?? null,
+      view: u.view ?? null,
+      createdAt: now(),
+      updatedAt: now(),
+      // embedding left null; a background script can fill it
     },
-    {
-      title: 'معلومات مشروع مدينتي',
-      url: 'https://example.com/madinaty/ar',
-      lang: 'ar'
-    },
-    {
-      title: 'Eastown Factsheet EN',
-      url: 'https://example.com/eastown/en',
-      lang: 'en'
-    }
-  ];
+  });
+}
 
-  for (const s of sourceDocs) {
-    await prisma.sourceDoc.upsert({
-      where: { title: s.title },
-      update: { url: s.url, lang: s.lang, embedding: zeroVector },
-      create: { ...s, embedding: zeroVector }
-    });
+// -------------------- MAIN --------------------
+async function main() {
+  console.log('Seeding developers...');
+  for (const d of developers) {
+    await findOrCreateDeveloper(d);
   }
 
-  console.log('✅ Seed finished');
+  console.log('Seeding projects...');
+  for (const p of projects) {
+    await findOrCreateProject(p);
+  }
+
+  console.log('Seeding units...');
+  for (const u of units) {
+    await findOrCreateUnit(u);
+  }
+
+  console.log('Seed completed ✅');
 }
 
 main()
   .catch((e) => {
-    console.error('Seed error:', e);
+    console.error('Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {
