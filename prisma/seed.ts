@@ -1,7 +1,10 @@
 /* eslint-disable no-console */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
+// Helper for nullable JSON columns (use SQL NULL)
+const JSON_DB_NULL: Prisma.NullableJsonNullValueInput = Prisma.DbNull;
 
 type DevSeed = {
   name: string;
@@ -11,7 +14,7 @@ type DevSeed = {
 };
 
 type ProjectSeed = {
-  developerName: string; // we’ll resolve to developerId
+  developerName: string; // resolve to developerId
   name: string;
   city: string;
   district: string;
@@ -23,7 +26,7 @@ type ProjectSeed = {
 };
 
 type UnitSeed = {
-  projectName: string; // we’ll resolve to projectId
+  projectName: string; // resolve to projectId
   type: 'apartment' | 'villa' | 'th' | 'twin';
   bedrooms: number;
   bathrooms?: number | null;
@@ -32,20 +35,18 @@ type UnitSeed = {
   priceUsd?: number | null;
   currency?: string | null;
   images?: string[] | null;
-  paymentPlan?: Record<string, unknown> | null;
+  paymentPlan?: Record<string, unknown> | null; // JSON
   availability?: 'available' | 'reserved' | 'sold';
   floor?: number | null;
   view?: string | null;
 };
 
-// ---------- SAMPLE SEED DATA (small but enough to boot the app) ----------
 const developers: DevSeed[] = [
   { name: 'Palm Hills', country: 'Egypt', website: 'https://example.com' },
   { name: 'SODIC', country: 'Egypt', website: 'https://example.com' },
   { name: 'Talaat Moustafa Group', country: 'Egypt', website: 'https://example.com' },
   { name: 'Emaar Misr', country: 'Egypt', website: 'https://example.com' },
   { name: 'Mountain View', country: 'Egypt', website: 'https://example.com' },
-  { name: 'New City Dev', country: 'Egypt', website: 'https://example.com' },
 ];
 
 const projects: ProjectSeed[] = [
@@ -71,17 +72,6 @@ const projects: ProjectSeed[] = [
     amenities: ['Parks', 'Retail'],
     description: 'Established district in West Cairo.',
   },
-  {
-    developerName: 'Emaar Misr',
-    name: 'Mivida',
-    city: 'New Cairo',
-    district: '90th Street',
-    lat: 30.0209,
-    lng: 31.4577,
-    deliveryDate: 2027,
-    amenities: ['Mall', 'Schools'],
-    description: 'Green community by Emaar.',
-  },
 ];
 
 const units: UnitSeed[] = [
@@ -98,16 +88,6 @@ const units: UnitSeed[] = [
     view: 'Garden',
   },
   {
-    projectName: 'Palm Hills New Cairo',
-    type: 'villa',
-    bedrooms: 4,
-    bathrooms: 4,
-    sizeSqm: 310,
-    priceEgp: 21500000,
-    currency: 'EGP',
-    availability: 'available',
-  },
-  {
     projectName: 'SODIC West',
     type: 'apartment',
     bedrooms: 2,
@@ -117,29 +97,18 @@ const units: UnitSeed[] = [
     currency: 'EGP',
     availability: 'available',
   },
-  {
-    projectName: 'Mivida',
-    type: 'apartment',
-    bedrooms: 3,
-    bathrooms: 2,
-    sizeSqm: 160,
-    priceEgp: 9800000,
-    currency: 'EGP',
-    availability: 'reserved',
-  },
 ];
 
-// -------------------- UTILS --------------------
-function now() {
-  return new Date();
+const now = () => new Date();
+
+function toJsonInput(value: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+  if (value === undefined || value === null) return JSON_DB_NULL;
+  return value as Prisma.InputJsonValue;
 }
 
-async function findOrCreateDeveloper(d: DevSeed) {
-  const existing = await prisma.developer.findFirst({
-    where: { name: d.name },
-  });
+async function upsertDeveloper(d: DevSeed) {
+  const existing = await prisma.developer.findFirst({ where: { name: d.name } });
   if (existing) {
-    // Update minimal fields (avoid touching id)
     return prisma.developer.update({
       where: { id: existing.id },
       data: {
@@ -162,22 +131,11 @@ async function findOrCreateDeveloper(d: DevSeed) {
   });
 }
 
-async function findOrCreateProject(p: ProjectSeed) {
-  // Resolve developerId by name
-  const dev = await prisma.developer.findFirst({
-    where: { name: p.developerName },
-    select: { id: true },
-  });
-  if (!dev) {
-    throw new Error(
-      `Developer "${p.developerName}" not found while seeding project "${p.name}".`
-    );
-  }
+async function upsertProject(p: ProjectSeed) {
+  const dev = await prisma.developer.findFirst({ where: { name: p.developerName }, select: { id: true } });
+  if (!dev) throw new Error(`Developer "${p.developerName}" not found for project "${p.name}".`);
 
-  const existing = await prisma.project.findFirst({
-    where: { name: p.name, developerId: dev.id },
-  });
-
+  const existing = await prisma.project.findFirst({ where: { name: p.name, developerId: dev.id } });
   if (existing) {
     return prisma.project.update({
       where: { id: existing.id },
@@ -193,7 +151,6 @@ async function findOrCreateProject(p: ProjectSeed) {
       },
     });
   }
-
   return prisma.project.create({
     data: {
       developerId: dev.id,
@@ -211,27 +168,12 @@ async function findOrCreateProject(p: ProjectSeed) {
   });
 }
 
-async function findOrCreateUnit(u: UnitSeed) {
-  // Resolve projectId by name
-  const project = await prisma.project.findFirst({
-    where: { name: u.projectName },
-    select: { id: true },
-  });
-  if (!project) {
-    throw new Error(
-      `Project "${u.projectName}" not found while seeding a unit.`
-    );
-  }
+async function upsertUnit(u: UnitSeed) {
+  const project = await prisma.project.findFirst({ where: { name: u.projectName }, select: { id: true } });
+  if (!project) throw new Error(`Project "${u.projectName}" not found for unit.`);
 
-  // There’s no natural unique key; pick a “near-unique” fingerprint for seed purposes
   const existing = await prisma.unit.findFirst({
-    where: {
-      projectId: project.id,
-      type: u.type,
-      bedrooms: u.bedrooms,
-      sizeSqm: u.sizeSqm,
-      floor: u.floor ?? undefined,
-    },
+    where: { projectId: project.id, type: u.type, bedrooms: u.bedrooms, sizeSqm: u.sizeSqm, floor: u.floor ?? undefined },
   });
 
   if (existing) {
@@ -242,12 +184,11 @@ async function findOrCreateUnit(u: UnitSeed) {
         priceEgp: u.priceEgp ?? existing.priceEgp ?? null,
         priceUsd: u.priceUsd ?? existing.priceUsd ?? null,
         currency: u.currency ?? existing.currency ?? 'EGP',
-        images: u.images ?? existing.images ?? [],
-        paymentPlan: u.paymentPlan ?? existing.paymentPlan ?? null,
+        images: (u.images ?? existing.images ?? []) as string[],
+        paymentPlan: u.paymentPlan !== undefined ? toJsonInput(u.paymentPlan) : toJsonInput(existing.paymentPlan),
         availability: u.availability ?? existing.availability ?? 'available',
         view: u.view ?? existing.view ?? null,
         updatedAt: now(),
-        // don’t touch embedding here; your RAG job can update it later
       },
     });
   }
@@ -262,34 +203,26 @@ async function findOrCreateUnit(u: UnitSeed) {
       priceEgp: u.priceEgp ?? null,
       priceUsd: u.priceUsd ?? null,
       currency: u.currency ?? 'EGP',
-      images: u.images ?? [],
-      paymentPlan: u.paymentPlan ?? null,
+      images: (u.images ?? []) as string[],
+      paymentPlan: toJsonInput(u.paymentPlan ?? null),
       availability: u.availability ?? 'available',
       floor: u.floor ?? null,
       view: u.view ?? null,
       createdAt: now(),
       updatedAt: now(),
-      // embedding left null; a background script can fill it
     },
   });
 }
 
-// -------------------- MAIN --------------------
 async function main() {
   console.log('Seeding developers...');
-  for (const d of developers) {
-    await findOrCreateDeveloper(d);
-  }
+  for (const d of developers) await upsertDeveloper(d);
 
   console.log('Seeding projects...');
-  for (const p of projects) {
-    await findOrCreateProject(p);
-  }
+  for (const p of projects) await upsertProject(p);
 
   console.log('Seeding units...');
-  for (const u of units) {
-    await findOrCreateUnit(u);
-  }
+  for (const u of units) await upsertUnit(u);
 
   console.log('Seed completed ✅');
 }
