@@ -18,7 +18,7 @@
     "autoprefixer": "10.4.15",
     "next": "14.2.5",
     "next-auth": "4.24.7",
-    "next-intl": "3.16.2",
+    "next-intl": "4.3.4",
     "postcss": "8.4.31",
     "react": "18.3.1",
     "react-dom": "18.3.1",
