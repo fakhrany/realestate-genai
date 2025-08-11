@@ -31,6 +31,8 @@ export type RagResult = {
   pins: RagPin[];
 };
 
+type CityDistrict = { city: string | null; district: string | null };
+
 const ARABIC_DIGIT_MAP: Record<string, string> = {
   '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
   '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
@@ -72,9 +74,9 @@ export async function parseQuery(raw: string, locale: 'en' | 'ar'): Promise<Pars
   // price
   let priceMax: number | undefined;
   const pricePhrases = [
-    /(under|below|<=|<|max|budget)\s*([0-9\.]+\s*(?:k|m)?)/i,
-    /(اقل|أقل|تحت|حد أقصى|ميزانية)\s*([0-9\.]+\s*(?:k|m|مليون)?)/i,
-    /\b([0-9\.]+\s*(?:k|m|مليون))\s*(?:egp|جنيه|جنيه مصري)?/i
+    /(under|below|<=|<|max|budget)\s*([0-9.]+\s*(?:k|m)?)/i,
+    /(اقل|أقل|تحت|حد أقصى|ميزانية)\s*([0-9.]+\s*(?:k|m|مليون)?)/i,
+    /\b([0-9.]+\s*(?:k|m|مليون))\s*(?:egp|جنيه|جنيه مصري)?/i
   ];
   for (const re of pricePhrases) {
     const m = q.match(re);
@@ -88,13 +90,30 @@ export async function parseQuery(raw: string, locale: 'en' | 'ar'): Promise<Pars
   let city: string | undefined;
   let district: string | undefined;
   try {
-    const allProjects = await prisma.project.findMany({ select: { city: true, district: true } });
-    const cities = Array.from(new Set(allProjects.map((p) => p.city?.toLowerCase()).filter(Boolean))) as string[];
-    const districts = Array.from(new Set(allProjects.map((p) => p.district?.toLowerCase()).filter(Boolean))) as string[];
+    const allProjects: CityDistrict[] = await prisma.project.findMany({
+      select: { city: true, district: true }
+    });
+
+    const cities = Array.from(
+      new Set(
+        allProjects
+          .map((p: CityDistrict) => (p.city ?? '').toLowerCase())
+          .filter((s): s is string => s.length > 0)
+      )
+    );
+
+    const districts = Array.from(
+      new Set(
+        allProjects
+          .map((p: CityDistrict) => (p.district ?? '').toLowerCase())
+          .filter((s): s is string => s.length > 0)
+      )
+    );
+
     for (const c of cities) if (c && q.includes(c)) city = c;
     for (const d of districts) if (d && q.includes(d)) district = d;
   } catch {
-    // if DB not ready, just skip — filters will be empty
+    // if DB not ready, skip — filters remain empty
   }
 
   return { locale, priceMax, bedrooms, deliveryYear, city, district, textForEmbedding: q };
@@ -149,14 +168,12 @@ async function searchUnits(parsed: Parsed, limit = 24) {
   const emb = await embed(parsed.textForEmbedding);
 
   // Build Prisma filters
-  const where: any = {
-    project: {}
-  };
+  const where: any = { project: {} as any };
   if (parsed.priceMax) where.priceEgp = { lte: parsed.priceMax };
   if (parsed.bedrooms) where.bedrooms = parsed.bedrooms;
-  if (parsed.deliveryYear) where.project.deliveryDate = { gte: parsed.deliveryYear };
-  if (parsed.city) where.project.city = { equals: parsed.city, mode: 'insensitive' };
-  if (parsed.district) where.project.district = { equals: parsed.district, mode: 'insensitive' };
+  if (parsed.deliveryYear) (where.project as any).deliveryDate = { gte: parsed.deliveryYear };
+  if (parsed.city) (where.project as any).city = { equals: parsed.city, mode: 'insensitive' };
+  if (parsed.district) (where.project as any).district = { equals: parsed.district, mode: 'insensitive' };
 
   const units = await prisma.unit.findMany({
     where,
@@ -177,16 +194,24 @@ async function searchUnits(parsed: Parsed, limit = 24) {
 
 async function searchSources(parsed: Parsed, limit = 5) {
   const emb = await embed(parsed.textForEmbedding);
-  const docs = await prisma.sourceDoc.findMany({
-    where: { lang: parsed.locale },
-    take: limit * 3
-  });
-  const scored = docs.map((d) => ({
-    d,
-    score: Array.isArray(d.embedding) ? cosine(d.embedding as unknown as number[], emb) : 0
-  }));
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.d);
+  // If you haven't created SourceDoc in your Prisma schema yet, either create it
+  // or switch this to return an empty array gracefully.
+  try {
+    const docs = await prisma.sourceDoc.findMany({
+      where: { lang: parsed.locale },
+      take: limit * 3
+    });
+    const scored = docs.map((d) => ({
+      d,
+      score: Array.isArray((d as any).embedding)
+        ? cosine((d as any).embedding as unknown as number[], emb)
+        : 0
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit).map((s) => s.d);
+  } catch {
+    return [];
+  }
 }
 
 export async function runRag({
