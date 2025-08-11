@@ -45,9 +45,7 @@ function normalizeDigits(input: string): string {
 function toNumberLike(raw: string): number | undefined {
   if (!raw) return undefined;
   const s = normalizeDigits(raw).trim().toLowerCase();
-  // remove currency words/spaces/commas
   const base = s.replace(/(egp|جنيه|جنيه مصري|usd|\s|,)/g, '');
-  // k / m in English; "مليون" in Arabic
   if (base.endsWith('k')) return parseFloat(base.replace('k', '')) * 1_000;
   if (base.endsWith('m')) return parseFloat(base.replace('m', '')) * 1_000_000;
   if (base.endsWith('مليون')) return parseFloat(base.replace('مليون', '')) * 1_000_000;
@@ -59,19 +57,16 @@ export async function parseQuery(raw: string, locale: 'en' | 'ar'): Promise<Pars
   const q0 = normalizeDigits(raw).toLowerCase();
   const q = q0.normalize('NFKC');
 
-  // bedrooms
   let bedrooms: number | undefined;
   const bedReEn = /(\b|_)(?:bed|beds|bedroom|bedrooms)\s*(\d{1,2})/i;
   const bedReAr = /(\b|_)(?:غرف|غرفة|نوم)\s*(\d{1,2})/i;
   const mBed = q.match(locale === 'ar' ? bedReAr : bedReEn) || q.match(bedReEn) || q.match(bedReAr);
   if (mBed) bedrooms = parseInt(mBed[2]);
 
-  // year
   let deliveryYear: number | undefined;
   const mYear = q.match(/20\d{2}/);
   if (mYear) deliveryYear = parseInt(mYear[0]);
 
-  // price
   let priceMax: number | undefined;
   const pricePhrases = [
     /(under|below|<=|<|max|budget)\s*([0-9.]+\s*(?:k|m)?)/i,
@@ -86,7 +81,6 @@ export async function parseQuery(raw: string, locale: 'en' | 'ar'): Promise<Pars
     }
   }
 
-  // city / district detection from DB values
   let city: string | undefined;
   let district: string | undefined;
   try {
@@ -113,14 +107,13 @@ export async function parseQuery(raw: string, locale: 'en' | 'ar'): Promise<Pars
     for (const c of cities) if (c && q.includes(c)) city = c;
     for (const d of districts) if (d && q.includes(d)) district = d;
   } catch {
-    // if DB not ready, skip — filters remain empty
+    // DB not ready; skip
   }
 
   return { locale, priceMax, bedrooms, deliveryYear, city, district, textForEmbedding: q };
 }
 
 async function embed(text: string): Promise<number[]> {
-  // Try OpenAI embeddings if provided
   if (process.env.OPENAI_API_KEY) {
     const res = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
@@ -134,7 +127,6 @@ async function embed(text: string): Promise<number[]> {
     const json: any = await res.json();
     return json.data[0].embedding as number[];
   }
-  // Deterministic fallback vector (length 1536) — works with Float[]
   const vec = new Array(1536).fill(0) as number[];
   let i = 0;
   for (const ch of Array.from(text)) {
@@ -167,7 +159,6 @@ function fmtPrice(egp?: number | null, usd?: number | null, currency = 'EGP') {
 async function searchUnits(parsed: Parsed, limit = 24) {
   const emb = await embed(parsed.textForEmbedding);
 
-  // Build Prisma filters
   const where: any = { project: {} as any };
   if (parsed.priceMax) where.priceEgp = { lte: parsed.priceMax };
   if (parsed.bedrooms) where.bedrooms = parsed.bedrooms;
@@ -177,13 +168,13 @@ async function searchUnits(parsed: Parsed, limit = 24) {
 
   const units = await prisma.unit.findMany({
     where,
-    take: limit * 3, // over-fetch, we'll sort by cosine
+    take: limit * 3,
     include: {
       project: { select: { name: true, lat: true, lng: true } }
     }
   });
 
-  const scored = units.map((u) => ({
+  const scored = units.map((u: any) => ({
     u,
     score: Array.isArray(u.embedding) ? cosine(u.embedding as unknown as number[], emb) : 0
   }));
@@ -194,17 +185,15 @@ async function searchUnits(parsed: Parsed, limit = 24) {
 
 async function searchSources(parsed: Parsed, limit = 5) {
   const emb = await embed(parsed.textForEmbedding);
-  // If you haven't created SourceDoc in your Prisma schema yet, either create it
-  // or switch this to return an empty array gracefully.
   try {
     const docs = await prisma.sourceDoc.findMany({
       where: { lang: parsed.locale },
       take: limit * 3
     });
-    const scored = docs.map((d) => ({
+    const scored = docs.map((d: any) => ({
       d,
-      score: Array.isArray((d as any).embedding)
-        ? cosine((d as any).embedding as unknown as number[], emb)
+      score: Array.isArray(d.embedding)
+        ? cosine(d.embedding as unknown as number[], emb)
         : 0
     }));
     scored.sort((a, b) => b.score - a.score);
@@ -225,7 +214,7 @@ export async function runRag({
   const [units, sources] = await Promise.all([searchUnits(parsed), searchSources(parsed)]);
 
   const pins: RagPin[] = units
-    .filter((u) => typeof (u as any).project?.lat === 'number' && typeof (u as any).project?.lng === 'number')
+    .filter((u: any) => typeof u.project?.lat === 'number' && typeof u.project?.lng === 'number')
     .map((u: any) => ({
       id: String(u.id),
       lat: Number(u.project.lat),
