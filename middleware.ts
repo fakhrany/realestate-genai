@@ -1,11 +1,11 @@
 // middleware.ts (root)
 import createMiddleware from 'next-intl/middleware';
+import nextIntlConfig from './next-intl.config'; // imports the .js default export
 
-// Import the JS config with its extension so Node can resolve it in the serverless bundle
-const i18nConfig = require('./next-intl.config.js');
+export default createMiddleware(nextIntlConfig);
 
-export default createMiddleware(i18nConfig);
-
+// Do NOT rename this export; Next.js looks for "config"
 export const config = {
-  matcher: ['/', '/(.*)']
+  // Exclude Next internals, assets and API routes
+  matcher: ['/((?!api|_next|.*\\..*).*)']
 };
