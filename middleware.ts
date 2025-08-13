@@ -1,13 +1,9 @@
-// middleware.ts
+// middleware.ts (root)
 import createMiddleware from 'next-intl/middleware';
-
-// Import the JS config without extension so Node resolves it correctly
-// (works both locally and on Vercel)
-const i18nConfig = require('./next-intl.config.js');
+import i18nConfig from './next-intl.config';
 
 export default createMiddleware(i18nConfig);
 
 export const config = {
-  // Run middleware on everything (including / and locale paths)
   matcher: ['/', '/(.*)']
 };
