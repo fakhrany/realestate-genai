@@ -1,25 +1,26 @@
 // app/[locale]/layout.tsx
-import type {ReactNode} from 'react';
-import {NextIntlClientProvider} from 'next-intl';
-import {getMessages} from 'next-intl/server';
-import '../styles/globals.css';
+import '../../styles/globals.css';
+import type { ReactNode } from 'react';
+import { NextIntlClientProvider } from 'next-intl';
+import { getMessages } from '@/i18n/request';
 
 export const metadata = {
   title: 'RealEstate GenAI',
   description: 'Perplexity-style real estate search'
 };
 
-export default async function LocaleLayout({
+export default async function RootLayout({
   children,
-  params: {locale}
+  params
 }: {
   children: ReactNode;
-  params: {locale: string};
+  params: { locale: 'en' | 'ar' };
 }) {
-  const messages = await getMessages();
+  const locale = params?.locale ?? 'en';
+  const messages = await getMessages(locale);
 
   return (
-    <html lang={locale}>
+    <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
