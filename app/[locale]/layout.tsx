@@ -1,6 +1,6 @@
 // app/[locale]/layout.tsx
 import type { ReactNode } from 'react';
-import '../globals.css'; // ✅ correct path — file lives at app/globals.css
+import '../globals.css'; // correct path
 
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
