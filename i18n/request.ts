@@ -1,19 +1,9 @@
 // i18n/request.ts
-import {createRequestConfig} from 'next-intl/server';
+import {getRequestConfig} from 'next-intl/server';
 
-export default createRequestConfig({
-  // The locales your app supports
-  locales: ['en', 'ar'],
-
-  // The default locale
-  defaultLocale: 'en',
-
-  // Use "/en" and "/ar" prefixes consistently
-  localePrefix: 'always'
-
-  // If you later want per-route pathnames, you can add:
-  // pathnames: {
-  //   '/': '/',
-  //   '/admin': '/admin'
-  // }
-});
+export default getRequestConfig(async ({locale}) => ({
+  // Keep the active locale in the config
+  locale,
+  // Load the matching translation file from i18n/messages
+  messages: (await import(`./messages/${locale}.json`)).default
+}));
