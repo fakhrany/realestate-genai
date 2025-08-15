@@ -1,18 +1,16 @@
 // app/layout.tsx
-import '../styles/globals.css';
-import type { ReactNode } from 'react';
+import './globals.css';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'RealEstate GenAI',
-  description: 'Perplexity-style real estate search'
+export const metadata: Metadata = {
+  title: 'Real Estate GenAI',
+  description: 'AI-powered real estate search'
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" dir="ltr">
-      <body className="bg-[#FFFCF5] text-[#0B0B0B] antialiased">
-        {children}
-      </body>
+    <html>
+      <body>{children}</body>
     </html>
   );
 }
