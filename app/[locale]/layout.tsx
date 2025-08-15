@@ -1,9 +1,9 @@
 // app/[locale]/layout.tsx
-import type {ReactNode} from 'react';
-import '../globals.css'; // <-- correct path (there is no ../styles/globals.css)
+import type { ReactNode } from 'react';
+import '../globals.css'; // ✅ correct path — file lives at app/globals.css
 
-import {NextIntlClientProvider} from 'next-intl';
-import {getMessages} from 'next-intl/server';
+import { NextIntlClientProvider } from 'next-intl';
+import { getMessages } from 'next-intl/server';
 
 export const metadata = {
   title: 'RealEstate GenAI',
@@ -12,13 +12,11 @@ export const metadata = {
 
 type Props = {
   children: ReactNode;
-  params: {locale: string};
+  params: { locale: string };
 };
 
-export default async function LocaleLayout({children, params}: Props) {
-  const {locale} = params;
-
-  // Load messages for the current locale (uses next-intl + your middleware)
+export default async function LocaleLayout({ children, params }: Props) {
+  const { locale } = params;
   const messages = await getMessages();
 
   return (
@@ -32,7 +30,6 @@ export default async function LocaleLayout({children, params}: Props) {
   );
 }
 
-// Pre-generate the two locales
 export function generateStaticParams() {
-  return [{locale: 'en'}, {locale: 'ar'}];
+  return [{ locale: 'en' }, { locale: 'ar' }];
 }
