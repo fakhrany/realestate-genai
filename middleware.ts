@@ -1,11 +1,11 @@
 // middleware.ts (root)
 import createMiddleware from 'next-intl/middleware';
-import nextIntlConfig from './next-intl.config'; // imports the .js default export
+// Import the ESM config; the bundler will include it
+import intlConfig from './next-intl.config.mjs';
 
-export default createMiddleware(nextIntlConfig);
+export default createMiddleware(intlConfig);
 
-// Do NOT rename this export; Next.js looks for "config"
+// Next.js reads this for routing; keep API/_next/static excluded
 export const config = {
-  // Exclude Next internals, assets and API routes
   matcher: ['/((?!api|_next|.*\\..*).*)']
 };
