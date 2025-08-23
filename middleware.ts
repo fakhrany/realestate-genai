@@ -1,10 +1,10 @@
-// middleware.ts (repo root)
+// middleware.ts
 import createMiddleware from 'next-intl/middleware';
-import i18nConfig from './next-intl.config';
+import intlConfig from './next-intl.config';
 
-export default createMiddleware(i18nConfig);
+export default createMiddleware(intlConfig);
 
-// Match the root and your locale segments
+// Only match localized paths (and the root)
 export const config = {
   matcher: ['/', '/(en|ar)/:path*']
 };
